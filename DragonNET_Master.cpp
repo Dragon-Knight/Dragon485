@@ -11,9 +11,6 @@ DragonNET_Master::DragonNET_Master(HardwareSerial &serial, uint8_t directionPin)
 	//this->_serial = serial;
 	this->_directionPin = directionPin;
 	
-	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
-	this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
-	
 	return;
 }
 #else
@@ -26,17 +23,23 @@ DragonNET_Master::DragonNET_Master(uint8_t RXPin, uint8_t TXPin, uint8_t directi
 }
 #endif
 
-void DragonNET_Master::Begin(uint8_t address, uint32_t baudRate)
+void DragonNET_Master::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
 {
 	this->_serial->begin(baudRate);
 	this->_address = address;
+	this->_receiveAll = receiveAll;
+	
 	pinMode(this->_directionPin, OUTPUT);
 	digitalWrite(this->_directionPin, LOW);
+	
+	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
+	this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
 	
 	return;
 }
 
-void DragonNET_Master::AttachRXCallback(void (*callback)(uint8_t fromAddress, byte *data, uint8_t dataLength))
+//void DragonNET_Master::AttachRXCallback(void (*callback)(uint8_t fromAddress, byte *data, uint8_t dataLength))
+void DragonNET_Master::AttachRXCallback(void (*callback)(byte *data, uint8_t dataLength))
 {
 	this->_callback = callback;
 	
@@ -63,6 +66,34 @@ void DragonNET_Master::AttachRXCallback(void (*callback)(uint8_t fromAddress, by
 
 void DragonNET_Master::TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength)
 {
+	/*
+	uint8_t i;
+	
+	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
+	
+	this->_TXBuffer[0] = DRAGONNET_STARTBYTE;
+	this->_TXBuffer[1] = toAddress;
+	this->_TXBuffer[2] = this->_address;
+	this->_TXBuffer[3] = this->_parameter[0];
+	this->_TXBuffer[4] = this->_parameter[1];
+	this->_TXBuffer[5] = dataLength;
+	for(i = 0; i < dataLength; ++i)
+	{
+		this->_TXBuffer[6+i] = data[i];
+	}
+	this->_TXBuffer[8+i] = DRAGONNET_ENDBYTE;
+	
+	uint16_t crc = this->CRC16(this->_TXBuffer, (dataLength + 9));
+	
+	this->_TXBuffer[6+i] = highByte(crc);
+	this->_TXBuffer[7+i] = lowByte(crc);
+	
+	digitalWrite(this->_directionPin, HIGH);
+	this->_serial->write(this->_TXBuffer, (dataLength + 9));
+	digitalWrite(this->_directionPin, LOW);
+	*/
+	
+
 	this->_TXBuffer[0] = toAddress;
 	this->_TXBuffer[1] = this->_address;
 	this->_TXBuffer[2] = this->_parameter[0];
@@ -81,58 +112,60 @@ void DragonNET_Master::TransmitPackage(uint8_t toAddress, byte *data, uint8_t da
 	this->_serial->write(lowByte(crc));
 	this->_serial->write(DRAGONNET_ENDBYTE);
 	digitalWrite(this->_directionPin, LOW);
+
 	
 	return;
 }
 
 void DragonNET_Master::ReceivePackage()
 {
-	if(this->_lastReceiveTime + 10 <= millis())
+	uint32_t currentTime = millis();
+	
+	if(this->_lastReceiveTime + 100 <= currentTime)
 	{
+		this->_lastReceiveTime = currentTime;
+		
 		this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
 		this->_RXBufferIndex = 0;
+		//this->_serial->write(0xEE); // Два раза вызывается?
 	}
 	
-	bool received = false;
-	
+	bool isReceived = false;
 	while(this->_serial->available() > 0)
 	{
-		this->_RXBuffer[this->_RXBufferIndex] = this->_serial->read();
-		this->_RXBufferIndex++;
-		received = true;
+		this->_RXBuffer[this->_RXBufferIndex++] = this->_serial->read();
+		isReceived = true;
 	}
 	
-	if(received == true)
+	if(isReceived == true)
 	{
 		if(this->_RXBuffer[0] == DRAGONNET_STARTBYTE && this->_RXBuffer[(this->_RXBufferIndex - 1)] == DRAGONNET_ENDBYTE)
 		{
-			uint16_t crc = this->CRC16(this->_RXBuffer, (this->_RXBufferIndex - 3));
+			uint16_t crc = this->CRC16(this->_RXBuffer + 1, (this->_RXBufferIndex - 4));
 			
 			if(this->_RXBuffer[(this->_RXBufferIndex - 3)] == highByte(crc) && this->_RXBuffer[(this->_RXBufferIndex - 2)] == lowByte(crc))
 			{
-				if(this->_RXBuffer[1] == this->_address || this->_RXBuffer[1] == DRAGONNET_BROADCASTADDRESS)
+				if(this->_RXBuffer[1] == this->_address || this->_RXBuffer[1] == DRAGONNET_BROADCASTADDRESS || this->_receiveAll == true)
 				{
-					this->_callback(this->_RXBuffer[2], this->_RXBuffer, this->_RXBufferIndex);
+					//this->_callback(this->_RXBuffer[2], this->_RXBuffer, this->_RXBufferIndex);
+					this->_callback(this->_RXBuffer, this->_RXBufferIndex);
 				}
+				else
+				{
+					this->_serial->write(0xE1);
+					// Пакет предназначен не для этого устройства.
+				}
+			}
+			else
+			{
+				this->_serial->write(0xE2);
+				// Ошибка CRC.
 			}
 		}
 	}
 	
-	
-	
-	
-	
-	this->_lastReceiveTime = millis();
-	
 	return;
 }
-
-
-
-
-
-
-
 
 
 uint16_t DragonNET_Master::CRC16(byte *data, uint8_t length)
