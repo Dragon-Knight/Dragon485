@@ -5,27 +5,27 @@
 #include <Arduino.h>
 #include "DragonNET.h"
 
-#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-DragonNET_Master::DragonNET_Master(HardwareSerial &serial, uint8_t directionPin) : _serial(&serial)
+//#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+DragonNET_Master::DragonNET_Master(HardwareSerial &serial, uint8_t directionPin, uint32_t baudRate) :
+	_serial(&serial),
+	_directionPin(directionPin)
 {
-	//this->_serial = serial;
-	this->_directionPin = directionPin;
 	
-	return;
+	serial.begin(baudRate);
 }
-#else
-DragonNET_Master::DragonNET_Master(uint8_t RXPin, uint8_t TXPin, uint8_t directionPin) : _serial(&SoftwareSerial(RXPin, TXPin))
+//#else
+//DragonNET_Master::DragonNET_Master(uint8_t RXPin, uint8_t TXPin, uint8_t directionPin) : _serial(&SoftwareSerial(RXPin, TXPin))
+DragonNET_Master::DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin, uint32_t baudRate) :
+	_serial(&serial),
+	_directionPin(directionPin)
 {
-	//this->_serial = &SoftwareSerial(RXPin, TXPin);		// Нужно & ?
-	this->_directionPin = directionPin;
-	
-	return;
+	serial.begin(baudRate);
 }
-#endif
+//#endif
 
-void DragonNET_Master::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
+void DragonNET_Master::Begin(uint8_t address, bool receiveAll)
 {
-	this->_serial->begin(baudRate);
+	//this->_serial->begin(baudRate);
 	this->_address = address;
 	this->_receiveAll = receiveAll;
 	
