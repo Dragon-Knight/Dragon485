@@ -6,10 +6,17 @@
 
 
 #if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-DragonNET_Master bus(Serial, 13);
+DragonNET_Master bus(Serial, 13, 115200);
 #else
-DragonNET_Master bus(2, 3, 13)
+SoftwareSerial serial(2,3);
+DragonNET_Master bus(serial, 13, 115200);
+
+// Вот так не скомпилируется из-за третьего конструктора, который delete
+//DragonNET_Master bus(SoftwareSerial(2,3), 13, 115200);
+
 #endif
+
+
 
 
 
@@ -22,7 +29,7 @@ void setup()
 	//Serial.begin(115200);
 	//Serial.setTimeout(25);
 	
-	bus.Begin(115200, 0x00, true);
+	bus.Begin(0x00, true);
 	bus.AttachRXCallback(OnReceive);
 	
 	byte data[] = {'H', 'e', 'l', 'l', 'o', ',', ' ', 'W', 'o', 'r', 'l', 'd', '!'};

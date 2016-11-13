@@ -16,12 +16,19 @@
 class DragonNET_Master
 {
 	public:
+		/*
 		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
 		DragonNET_Master(HardwareSerial &serial, uint8_t directionPin);
 		#else
 		DragonNET_Master(uint8_t RXPin, uint8_t TXPin, uint8_t directionPin);
 		#endif
-		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll);
+		*/
+		DragonNET_Master(HardwareSerial &serial, uint8_t directionPin, uint32_t baudRate);
+		DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin, uint32_t baudRate);
+		DragonNET_Master(SoftwareSerial &&serial, uint8_t directionPin, uint32_t baudRate) = delete;
+		
+
+		void Begin(uint8_t address, bool receiveAll);
 		//void AttachRXCallback(void (*callback)(uint8_t fromAddress, byte *data, uint8_t dataLength));
 		void AttachRXCallback(void (*callback)(byte *data, uint8_t dataLength));
 		void TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength);
@@ -32,11 +39,14 @@ class DragonNET_Master
 		uint16_t CRC16(byte *data, uint8_t length);
 		void ClearArray(byte *array, uint8_t length);
 		
+		/*
 		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
 		HardwareSerial *_serial;
 		#else
 		SoftwareSerial *_serial;
 		#endif
+		*/
+		Stream *_serial;
 		
 		byte _TXBuffer[64 + 7];
 		byte _RXBuffer[64 + 7];
