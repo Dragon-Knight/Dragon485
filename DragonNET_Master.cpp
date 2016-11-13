@@ -5,27 +5,30 @@
 #include <Arduino.h>
 #include "DragonNET.h"
 
-//#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-DragonNET_Master::DragonNET_Master(HardwareSerial &serial, uint8_t directionPin, uint32_t baudRate) :
-	_serial(&serial),
-	_directionPin(directionPin)
+DragonNET_Master::DragonNET_Master(HardwareSerial &serial, uint8_t directionPin, uint32_t baudRate) : _serial(&serial), _directionPin(directionPin)
 {
+	serial.begin(baudRate);
 	
-	serial.begin(baudRate);
+	serial.write(0x31);	// Отладка.
+	this->_serial->write(0x32);	// Отладка.
+	
+	return;
 }
-//#else
-//DragonNET_Master::DragonNET_Master(uint8_t RXPin, uint8_t TXPin, uint8_t directionPin) : _serial(&SoftwareSerial(RXPin, TXPin))
-DragonNET_Master::DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin, uint32_t baudRate) :
-	_serial(&serial),
-	_directionPin(directionPin)
+
+DragonNET_Master::DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin, uint32_t baudRate) : _serial(&serial), _directionPin(directionPin)
 {
 	serial.begin(baudRate);
+	
+	serial.write(0x31);	// Отладка.
+	this->_serial->write(0x32);	// Отладка.
+	
+	return;
 }
-//#endif
 
 void DragonNET_Master::Begin(uint8_t address, bool receiveAll)
 {
-	//this->_serial->begin(baudRate);
+	this->_serial->write(0x33);	// Отладка.
+	
 	this->_address = address;
 	this->_receiveAll = receiveAll;
 	
@@ -38,17 +41,19 @@ void DragonNET_Master::Begin(uint8_t address, bool receiveAll)
 	return;
 }
 
-//void DragonNET_Master::AttachRXCallback(void (*callback)(uint8_t fromAddress, byte *data, uint8_t dataLength))
-void DragonNET_Master::AttachRXCallback(void (*callback)(byte *data, uint8_t dataLength))
+void DragonNET_Master::AttachRXCallback(void (*callback)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength))
 {
-	this->_callback = callback;
+	this->_RXcallback = callback;
 	
 	return;
 }
 
-//void DragonNET_Master::Send
-
-
+void DragonNET_Master::AttachErrorCallback(void (*callback)(uint8_t errorType))
+{
+	this->_ErrorCallback = callback;
+	
+	return;
+}
 
 /*
 	Пакет:
@@ -66,34 +71,6 @@ void DragonNET_Master::AttachRXCallback(void (*callback)(byte *data, uint8_t dat
 
 void DragonNET_Master::TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength)
 {
-	/*
-	uint8_t i;
-	
-	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
-	
-	this->_TXBuffer[0] = DRAGONNET_STARTBYTE;
-	this->_TXBuffer[1] = toAddress;
-	this->_TXBuffer[2] = this->_address;
-	this->_TXBuffer[3] = this->_parameter[0];
-	this->_TXBuffer[4] = this->_parameter[1];
-	this->_TXBuffer[5] = dataLength;
-	for(i = 0; i < dataLength; ++i)
-	{
-		this->_TXBuffer[6+i] = data[i];
-	}
-	this->_TXBuffer[8+i] = DRAGONNET_ENDBYTE;
-	
-	uint16_t crc = this->CRC16(this->_TXBuffer, (dataLength + 9));
-	
-	this->_TXBuffer[6+i] = highByte(crc);
-	this->_TXBuffer[7+i] = lowByte(crc);
-	
-	digitalWrite(this->_directionPin, HIGH);
-	this->_serial->write(this->_TXBuffer, (dataLength + 9));
-	digitalWrite(this->_directionPin, LOW);
-	*/
-	
-
 	this->_TXBuffer[0] = toAddress;
 	this->_TXBuffer[1] = this->_address;
 	this->_TXBuffer[2] = this->_parameter[0];
@@ -103,6 +80,7 @@ void DragonNET_Master::TransmitPackage(uint8_t toAddress, byte *data, uint8_t da
 	{
 		this->_TXBuffer[5+i] = data[i];
 	}
+	
 	uint16_t crc = this->CRC16(this->_TXBuffer, (dataLength + 5));
 	
 	digitalWrite(this->_directionPin, HIGH);
@@ -112,7 +90,6 @@ void DragonNET_Master::TransmitPackage(uint8_t toAddress, byte *data, uint8_t da
 	this->_serial->write(lowByte(crc));
 	this->_serial->write(DRAGONNET_ENDBYTE);
 	digitalWrite(this->_directionPin, LOW);
-
 	
 	return;
 }
@@ -121,18 +98,28 @@ void DragonNET_Master::ReceivePackage()
 {
 	uint32_t currentTime = millis();
 	
-	if(this->_lastReceiveTime + 100 <= currentTime)
+	if(this->_lastReceiveTime + DRAGONNET_RECEIVETIMEOUT <= currentTime)
 	{
 		this->_lastReceiveTime = currentTime;
 		
+		while(this->_serial->available() > 0)
+		{
+			this->_serial->read();
+		}
+		
 		this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
 		this->_RXBufferIndex = 0;
-		//this->_serial->write(0xEE); // Два раза вызывается?
 	}
 	
 	bool isReceived = false;
 	while(this->_serial->available() > 0)
 	{
+		if(this->_RXBufferIndex == sizeof(this->_RXBuffer))
+		{
+			// Если буфер переполнен, то....
+			break;
+		}
+		
 		this->_RXBuffer[this->_RXBufferIndex++] = this->_serial->read();
 		isReceived = true;
 	}
@@ -147,8 +134,7 @@ void DragonNET_Master::ReceivePackage()
 			{
 				if(this->_RXBuffer[1] == this->_address || this->_RXBuffer[1] == DRAGONNET_BROADCASTADDRESS || this->_receiveAll == true)
 				{
-					//this->_callback(this->_RXBuffer[2], this->_RXBuffer, this->_RXBufferIndex);
-					this->_callback(this->_RXBuffer, this->_RXBufferIndex);
+					this->_RXcallback(this->_RXBuffer[2], this->_RXBuffer[1], this->_RXBuffer + 6, this->_RXBufferIndex - 9);
 				}
 				else
 				{
@@ -162,6 +148,8 @@ void DragonNET_Master::ReceivePackage()
 				// Ошибка CRC.
 			}
 		}
+		
+		this->_lastReceiveTime = currentTime;
 	}
 	
 	return;
@@ -187,7 +175,6 @@ uint16_t DragonNET_Master::CRC16(byte *data, uint8_t length)
 
 void DragonNET_Master::ClearArray(byte *array, uint8_t length)
 {
-	// А можно ли тут использовать sizeof() в замен length?
 	memset(array, 0x00, length);
 	
 	return;
