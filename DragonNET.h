@@ -1,6 +1,11 @@
 /*
-	
-*/
+ *	DragonNET.h
+ *
+ *	@author		Nikolai Tikhonov aka Dragon_Knight <dubki4132@mail.ru>, https://vk.com/globalzone_edev
+ *	@coauthor	Valeriy V Dmitriev aka valmat <ufabiz@gmail.com>
+ *	@licenses	MIT https://opensource.org/licenses/MIT
+ *	@repo		https://github.com/Dragon-Knight/DragonNET
+ */
 
 #ifndef DragonNET_h_
 #define DragonNET_h_
@@ -15,25 +20,35 @@
 #define DRAGONNET_RECEIVETIMEOUT	10
 #define DRAGONNET_BUFFERSIZE		64
 
-class DragonNET_Master
+
+class DragonNET
 {
 	public:
-		DragonNET_Master(HardwareSerial &serial, uint8_t directionPin, uint32_t baudRate);
-		DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin, uint32_t baudRate);
-		DragonNET_Master(SoftwareSerial &&serial, uint8_t directionPin, uint32_t baudRate) = delete;
+		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+		DragonNET(HardwareSerial &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ }
+		#else
+		DragonNET(SoftwareSerial &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ }
+		#endif
 		
-		void Begin(uint8_t address, bool receiveAll);
+		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll);
 		void AttachRXCallback(void (*callback)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength));
 		void AttachErrorCallback(void (*callback)(uint8_t errorType));
 		void TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength);
 		void ReceivePackage();
+		void SetParameter(uint8_t index, bool value);
+		bool GetParameter(uint8_t index);
 	protected:
 		
 	private:
-		uint16_t CRC16(byte *data, uint8_t length);
+		uint16_t CRC16(byte *array, uint8_t length);
 		void ClearArray(byte *array, uint8_t length);
 		
-		Stream *_serial;
+		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+		HardwareSerial *_serial;
+		#else
+		SoftwareSerial *_serial;
+		#endif
+		
 		byte _TXBuffer[DRAGONNET_BUFFERSIZE + 5];
 		byte _RXBuffer[DRAGONNET_BUFFERSIZE + 9];
 		uint8_t _RXBufferIndex = 0;
@@ -46,18 +61,41 @@ class DragonNET_Master
 		uint32_t _lastReceiveTime = 0;
 };
 
-class DragonNET_Slave
+class DragonNET_Master : public DragonNET
 {
 	public:
-		DragonNET_Slave();
+		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+		DragonNET_Master(HardwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		#else
+		DragonNET_Master(SoftwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		DragonNET_Master(SoftwareSerial &&serial, uint8_t directionPin) = delete;
+		#endif
 	protected:
 	private:
 };
 
-class DragonNET_P2P
+class DragonNET_Slave : public DragonNET
 {
 	public:
-		DragonNET_P2P();
+		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+		DragonNET_Slave(HardwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		#else
+		DragonNET_Slave(SoftwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		DragonNET_Slave(SoftwareSerial &&serial, uint8_t directionPin) = delete;
+		#endif
+	protected:
+	private:
+};
+
+class DragonNET_P2P : public DragonNET
+{
+	public:
+		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
+		DragonNET_P2P(HardwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		#else
+		DragonNET_P2P(SoftwareSerial &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ }
+		DragonNET_P2P(SoftwareSerial &&serial, uint8_t directionPin) = delete;
+		#endif
 	protected:
 	private:
 };
