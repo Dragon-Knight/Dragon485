@@ -12,7 +12,7 @@
 
 void DragonNET::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
 {
-	this->_serial->begin(baudRate);
+	this->_serial->begin(baudRate, SERIAL_8N2);
 	
 	this->_serial->write(0x33);	// Отладка.
 	
@@ -76,6 +76,7 @@ void DragonNET::TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLengt
 	this->_serial->write(highByte(crc));
 	this->_serial->write(lowByte(crc));
 	this->_serial->write(DRAGONNET_ENDBYTE);
+	this->_serial->flush();
 	digitalWrite(this->_directionPin, LOW);
 	
 	return;
