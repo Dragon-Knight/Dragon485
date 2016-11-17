@@ -43,6 +43,9 @@ class DragonNET
 		uint16_t CRC16(byte *array, uint8_t length);
 		void ClearArray(byte *array, uint8_t length);
 		
+		void (*_RXcallback)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength);
+		void (*_ErrorCallback)(uint8_t errorType);
+
 		#if !defined(DRAGONNET_USE_SOFTWARESERIAL)
 		HardwareSerial *_serial;
 		#else
@@ -51,14 +54,12 @@ class DragonNET
 		
 		byte _TXBuffer[DRAGONNET_BUFFERSIZE + 5];
 		byte _RXBuffer[DRAGONNET_BUFFERSIZE + 9];
+		uint32_t _lastReceiveTime = 0;
 		uint8_t _RXBufferIndex = 0;
-		void (*_RXcallback)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength);
-		void (*_ErrorCallback)(uint8_t errorType);
 		uint8_t _directionPin;
 		uint8_t _address;
-		bool _receiveAll;
 		byte _parameter[2];
-		uint32_t _lastReceiveTime = 0;
+		bool _receiveAll;
 };
 
 class DragonNET_Master : public DragonNET
