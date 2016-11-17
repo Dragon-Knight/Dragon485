@@ -12,8 +12,16 @@
 
 void DragonNET::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
 {
-	this->_serial->begin(baudRate, SERIAL_8N2);
-	
+	// Для вызова метода begin, который не виртуальный, восстанавливаем информацию о типе
+	if(_isHWSerial) {
+		// XXX Можно изменить список аргументов на тот, который требуется
+		static_cast<HardwareSerial *>(_serial)->begin(baudRate, SERIAL_8N2);
+	} else {
+		// XXX Можно изменить список аргументов на тот, который требуется
+		static_cast<SoftwareSerial *>(_serial)->begin(baudRate);
+	}
+
+
 	this->_serial->write(0x33);	// Отладка.
 	
 	this->_address = address;
