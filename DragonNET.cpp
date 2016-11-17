@@ -15,10 +15,10 @@ void DragonNET::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
 	// Для вызова метода begin, который не виртуальный, восстанавливаем информацию о типе
 	if(_isHWSerial) {
 		// XXX Можно изменить список аргументов на тот, который требуется
-		static_cast<HardwareSerial *>(_serial)->begin(baudRate, SERIAL_8N2);
+		static_cast<HardwareSerial*>(_serial)->begin(baudRate, SERIAL_8N2);
 	} else {
 		// XXX Можно изменить список аргументов на тот, который требуется
-		static_cast<SoftwareSerial *>(_serial)->begin(baudRate);
+		static_cast<SoftwareSerial*>(_serial)->begin(baudRate);
 	}
 
 
@@ -32,22 +32,16 @@ void DragonNET::Begin(uint32_t baudRate, uint8_t address, bool receiveAll)
 	
 	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
 	this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
-	
-	return;
 }
 
-void DragonNET::AttachRXCallback(void (*callback)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength))
+void DragonNET::AttachRXCallback(RXcallback_t callback)
 {
 	this->_RXcallback = callback;
-	
-	return;
 }
 
-void DragonNET::AttachErrorCallback(void (*callback)(uint8_t errorType))
+void DragonNET::AttachErrorCallback(ErrorCallback_t callback)
 {
 	this->_ErrorCallback = callback;
-	
-	return;
 }
 
 /*
@@ -86,8 +80,6 @@ void DragonNET::TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLengt
 	this->_serial->write(DRAGONNET_ENDBYTE);
 	this->_serial->flush();
 	digitalWrite(this->_directionPin, LOW);
-	
-	return;
 }
 
 void DragonNET::ReceivePackage()
@@ -147,38 +139,20 @@ void DragonNET::ReceivePackage()
 		
 		this->_lastReceiveTime = currentTime;
 	}
-	
-	return;
 }
 
 void DragonNET::SetParameter(uint8_t index, bool value)
 {
-	if(index > 7)
-	{
-		bitWrite(this->_parameter[1], (index % 8), value);
-	}
-	else
-	{
-		bitWrite(this->_parameter[0], (index % 8), value);
-	}
-	
-	return;
+	(index > 7) ?
+		bitWrite(this->_parameter[1], index % 8, value) :
+		bitWrite(this->_parameter[0], index % 8, value);
 }
 
 bool DragonNET::GetParameter(uint8_t index)
 {
-	bool result;
-	
-	if(index > 7)
-	{
-		result = bitRead(this->_parameter[1], (index % 8));
-	}
-	else
-	{
-		result = bitRead(this->_parameter[0], (index % 8));
-	}
-	
-	return result;
+	return (index > 7) ?
+		bitRead(this->_parameter[1], index % 8) :
+		bitRead(this->_parameter[0], index % 8);
 }
 
 
@@ -202,6 +176,4 @@ uint16_t DragonNET::CRC16(byte *array, uint8_t length)
 void DragonNET::ClearArray(byte *array, uint8_t length)
 {
 	memset(array, 0x00, length);
-	
-	return;
 }
