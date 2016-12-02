@@ -8,6 +8,9 @@
  *	@repo		https://github.com/Dragon-Knight/DragonNET
  */
 
+#ifndef DragonNET_Packet_h_
+#define DragonNET_Packet_h_
+
 #if defined(ARDUINO_ARCH_AVR)
 	#include <util/crc16.h>
 #else
@@ -24,6 +27,9 @@ template <uint8_t _maxDataLength>
 class DragonNET_Packet
 {
 	public:
+		/*
+			Конструктор.
+		*/
 		DragonNET_Packet()
 		{
 			this->Cleaning();
@@ -31,6 +37,9 @@ class DragonNET_Packet
 			return;
 		}
 		
+		/*
+			Деструктор.
+		*/
 		~DragonNET_Packet()
 		{
 			return;
@@ -47,6 +56,14 @@ class DragonNET_Packet
 		}
 		
 		/*
+			Получить адрес получателя.
+		*/
+		uint8_t TakeToAddress()
+		{
+			return this->_buffer[1];
+		}
+		
+		/*
 			Вставить адрес отправителя.
 		*/
 		void PutFromAddress(uint8_t address)
@@ -54,6 +71,14 @@ class DragonNET_Packet
 			this->_buffer[2] = address;
 			
 			return;
+		}
+		
+		/*
+			Получить адрес отправителя.
+		*/
+		uint8_t TakeFromAddress()
+		{
+			return this->_buffer[2];
 		}
 		
 		/*
@@ -67,7 +92,15 @@ class DragonNET_Packet
 		}
 		
 		/*
-			Вставить данные (побайтно).
+			Получить байт настройки.
+		*/
+		byte TakeConfigByte()
+		{
+			return this->_buffer[3];
+		}
+		
+		/*
+			Вставить данные побайтно.
 		*/
 		bool PutData(byte data)
 		{
@@ -85,92 +118,7 @@ class DragonNET_Packet
 		}
 		
 		/*
-			Вставить пакет (RAW данные, побайтно).
-		*/
-		/*
-		bool PutPacket(byte packet)
-		{
-			bool result = false;
-			
-			if(this->putPacketIndex <= (_maxDataLength + 8))
-			{
-				this->_buffer[this->putPacketIndex++] = packet;
-				
-				if(this->putPacketIndex > 4)
-				{
-					if(this->_buffer[4] <= (this->putPacketIndex + 5)
-					{
-						this->_buffer[(_maxDataLength + 7) - ()
-					}
-				}
-			}
-			
-			// не врубаюсь...
-			// Может всё-же сделать что-бы окончание массива (CRC16 и стоповый байт) был после данных а не в конце физического массива this->_buffer ???
-			
-			
-			return result;
-		}
-		*/
-		
-		/*
-			Вставить пакет (RAW данные, целиком).
-		*/
-		bool PutPacket(byte *packet, uint8_t length)
-		{
-			bool result = false;
-			
-			if(length <= (_maxDataLength + 8))
-			{
-				for(uint8_t i = 0; i < (length - 3); ++i)
-				{
-					this->_buffer[i] = packet;
-				}
-				
-				this->_buffer[_maxDataLength + 5] = packet[length - 3];
-				this->_buffer[_maxDataLength + 6] = packet[length - 2];
-				this->_buffer[_maxDataLength + 7] = packet[length - 1];
-				
-				result = true;
-			}
-			
-			return result;
-		}
-		
-		/*
-			Получить адрес получателя.
-		*/
-		uint8_t TakeToAddress()
-		{
-			return this->_buffer[1];
-		}
-		
-		/*
-			Получить адрес отправителя.
-		*/
-		uint8_t TakeFromAddress()
-		{
-			return this->_buffer[2];
-		}
-		
-		/*
-			Получить байт настройки.
-		*/
-		byte TakeConfigByte()
-		{
-			return this->_buffer[3];
-		}
-		
-		/*
-			Получить длину данных.
-		*/
-		uint8_t TakeDataLength()
-		{
-			return this->_buffer[4];
-		}
-		
-		/*
-			Получить данные (побайтно).
+			Получить данные побайтно.
 		*/
 		byte TakeData()
 		{
@@ -185,6 +133,103 @@ class DragonNET_Packet
 		}
 		
 		/*
+			Вставить данные по ссылке.
+		*/
+		bool PutData(byte *data, uint8_t length)
+		{
+			bool result = false;
+			
+			if(length <= _maxDataLength)
+			{
+				for(uint8_t i = 0; i < length; ++i)
+				{
+					this->_buffer[5 + i] = data[i];
+				}
+				this->_buffer[4] = length;
+				
+				result = true;
+			}
+			
+			return result;
+		}
+		
+		/*
+			Получить данные по ссылке.
+		*/
+		byte *TakeData()
+		{
+			return &this->_buffer + 5;
+		}
+		
+		/*
+			Получить длину данных.
+		*/
+		uint8_t TakeDataLength()
+		{
+			return this->_buffer[4];
+		}
+		
+		/*
+			Вставить пакет побайтно.
+		*/
+		bool PutPacket(byte packet)
+		{
+			bool result = false;
+			
+			if(this->putPacketIndex <= (_maxDataLength + 8))
+			{
+				this->_buffer[this->putPacketIndex++] = packet;
+				
+				result = true;
+			}
+			
+			return result;
+		}
+		
+		/*
+			Получить пакет побайтно.
+		*/
+		byte TakePacket()
+		{
+			byte result = 0x00;
+			
+			if(this->_takePacketIndex < (this->_buffer[4] + 8))
+			{
+				result = this->_buffer[this->_takePacketIndex++];
+			}
+			
+			return result;
+		}
+		
+		/*
+			Вставить пакет по ссылке.
+		*/
+		bool PutPacket(byte *packet, uint8_t length)
+		{
+			bool result = false;
+			
+			if(length <= (_maxDataLength + 8))
+			{
+				for(uint8_t i = 0; i < length; ++i)
+				{
+					this->_buffer[i] = packet[i];
+				}
+				
+				result = true;
+			}
+			
+			return result;
+		}
+		
+		/*
+			Получить пакет по ссылке.
+		*/
+		byte *TakePacket()
+		{
+			return &this->_buffer;
+		}
+		
+		/*
 			Получить длину пакета.
 		*/
 		uint8_t TakePacketLength()
@@ -193,41 +238,23 @@ class DragonNET_Packet
 		}
 		
 		/*
-			Получить пакет (RAW данные, побайтно).
+			Проверить пакет на валидность (Стартовый и топовый байт, длинна данных и фактическая длинна данных, CRC16).
 		*/
-		byte TakePacket()
+		bool IsValidPacket()
 		{
-			byte result = 0x00;
+			bool result = true;
 			
-			/*
-				Бред, но пока не знаю как сделать метод, который будет возвращать последовательность байт пакета в строгом порядке:
-				0)   стартовыйБайт;
-				1)   this->_toAddress;
-				2)   this->_fromAddress;
-				3)   this->_configByte;
-				4)   this->_dataLength;
-				5+n) this->_data[n++];
-				6+n) highByte(this->TakeCRC16);
-				7+n) lowByte(this->TakeCRC16);
-				8+n)   стоповыйБайт;
-				
-				Суть метода такая: Возвращает весь буфер, готовый к отправке, однако есть хитрость, которая, как мне кажется упрощает код:
-					CRC16 и стоповый байт находятся строго в конце массива и отсюда логика такая:
-					Читаем буфер и увеличиваем итератор _takePacketIndex. Как только этот итератор становится на 5 байтов больше чем длинна полезных данных,
-					мы перепрыгиваем в конец массива и запускаем генерацию CRC16.
-					Генерация CRC16 таким образом имеет практическое применение: Генерация запускается пока предыдущие данные потихоньку сливаются в UART,
-					и на этом этапе можно немного потупить :)
-			*/
-			
-			if(this->_takePacketIndex < (_maxDataLength + 8))
+			if(this->_buffer[0] != 0x5B || this->_buffer[this->_buffer[4] + 3] != 0x5D)
 			{
-				result = this->_buffer[this->_takePacketIndex++];
-				
-				if(this->_takePacketIndex == (this->_buffer[4] + 5))
-				{
-					this->_takePacketIndex = _maxDataLength + 6;
-					this->_crc16 = this->TakeCRC16();
-				}
+				// Нету стартового или стопового байта или нарушена длинна данных (указанная длинна одна а фактическая другая).
+				result = false;
+			}
+			
+			uint16_t crc = this->TakeCRC16();
+			if(this->_buffer[this->_buffer[4] + 1] != highByte(crc) || this->_buffer[this->_buffer[4] + 2] != lowByte(crc))
+			{
+				// Нарушена CRC пакета.
+				result = false;
 			}
 			
 			return result;
@@ -273,7 +300,7 @@ class DragonNET_Packet
 		uint16_t _crc16;
 };
 
-
+#endif
 
 /*
 	Пакет:
@@ -297,22 +324,20 @@ class DragonNET_Packet
 	Символом '*' указаны фрагменты данных, участвующие в подсчёте CRC16.
 */
 
-
 /*
 	Нужные методы:
-	1)  Вставить \ Взять адрес получателя.
-	2)  Вставить \ Взять адрес отправителя.
-	3)  Вставить \ Взять байт настройки.
-	4)  Вставить \ Взять данные побайтно.
-	5)  Вставить \ Взять данные по ссылке.
-	6)  Взять длину данных.
-	7)  Вставить \ Взять пакет побайтно.
-	8)  Вставить \ Взять пакет по ссылке.
-	9)  Взять длину пакета.
-	10) Проверить пакет на валидность (Стартовый и топовый байт, длинна данных и фактическая длинна данных, CRC16).
+	*1)  Вставить \ Взять адрес получателя.
+	*2)  Вставить \ Взять адрес отправителя.
+	*3)  Вставить \ Взять байт настройки.
+	*4)  Вставить \ Взять данные побайтно.
+	*5)  Вставить \ Взять данные по ссылке.
+	*6)  Взять длину данных.
+	*7)  Вставить \ Взять пакет побайтно.
+	*8)  Вставить \ Взять пакет по ссылке.
+	*9)  Взять длину пакета.
+	*10) Проверить пакет на валидность (Стартовый и топовый байт, длинна данных и фактическая длинна данных, CRC16).
+	
+	Не реализовано:
+		Логика проверки CRC16 при вставке готового пакета (приём пакета), а так-же вставка CRC16 в пакет, при сборе пакета (отправка пакета)
 
 */
-
-
-
-
