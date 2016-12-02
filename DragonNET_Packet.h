@@ -14,12 +14,15 @@
 #if defined(ARDUINO_ARCH_AVR)
 	#include <util/crc16.h>
 #else
-	uint16_t _crc_ccitt_update(uint16_t crc, uint8_t data)
+	namespace
 	{
-		data ^= crc & 0xff;
-		data ^= data << 4;
-		
-		return ((((uint16_t)data << 8) | ((crc >> 8) & 0xff)) ^ (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
+		inline uint16_t _crc_ccitt_update(uint16_t crc, uint8_t data)
+		{
+			data ^= crc & 0xff;
+			data ^= data << 4;
+			
+			return ((((uint16_t)data << 8) | ((crc >> 8) & 0xff)) ^ (uint8_t)(data >> 4) ^ ((uint16_t)data << 3));
+		}
 	}
 #endif
 
@@ -27,9 +30,6 @@ template <uint8_t _maxDataLength>
 class DragonNET_Packet
 {
 	public:
-		/*
-			Конструктор.
-		*/
 		DragonNET_Packet()
 		{
 			this->Cleaning();
@@ -37,17 +37,8 @@ class DragonNET_Packet
 			return;
 		}
 		
-		/*
-			Деструктор.
-		*/
-		~DragonNET_Packet()
-		{
-			return;
-		}
+		~DragonNET_Packet() = default;
 		
-		/*
-			Вставить адрес получателя.
-		*/
 		void PutToAddress(uint8_t address)
 		{
 			this->_buffer[1] = address;
@@ -55,17 +46,11 @@ class DragonNET_Packet
 			return;
 		}
 		
-		/*
-			Получить адрес получателя.
-		*/
-		uint8_t TakeToAddress()
+		uint8_t TakeToAddress() const
 		{
 			return this->_buffer[1];
 		}
 		
-		/*
-			Вставить адрес отправителя.
-		*/
 		void PutFromAddress(uint8_t address)
 		{
 			this->_buffer[2] = address;
@@ -73,17 +58,11 @@ class DragonNET_Packet
 			return;
 		}
 		
-		/*
-			Получить адрес отправителя.
-		*/
-		uint8_t TakeFromAddress()
+		uint8_t TakeFromAddress() const
 		{
 			return this->_buffer[2];
 		}
 		
-		/*
-			Вставить байт настройки.
-		*/
 		void PutConfigByte(byte config)
 		{
 			this->_buffer[3] = config;
@@ -91,18 +70,12 @@ class DragonNET_Packet
 			return;
 		}
 		
-		/*
-			Получить байт настройки.
-		*/
-		byte TakeConfigByte()
+		byte TakeConfigByte() const
 		{
 			return this->_buffer[3];
 		}
 		
-		/*
-			Вставить данные побайтно.
-		*/
-		bool PutData(byte data)
+		bool PutData1(byte data)
 		{
 			bool result = false;
 			
@@ -117,10 +90,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Получить данные побайтно.
-		*/
-		byte TakeData()
+		byte TakeData1() const
 		{
 			byte result = 0x00;
 			
@@ -132,10 +102,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Вставить данные по ссылке.
-		*/
-		bool PutData(byte *data, uint8_t length)
+		bool PutData2(byte *data, uint8_t length)
 		{
 			bool result = false;
 			
@@ -153,26 +120,17 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Получить данные по ссылке.
-		*/
-		byte *TakeData()
+		const byte *TakeData2() const
 		{
-			return &this->_buffer + 5;
+			return this->_buffer + 5;
 		}
 		
-		/*
-			Получить длину данных.
-		*/
-		uint8_t TakeDataLength()
+		uint8_t TakeDataLength() const
 		{
 			return this->_buffer[4];
 		}
 		
-		/*
-			Вставить пакет побайтно.
-		*/
-		bool PutPacket(byte packet)
+		bool PutPacket1(byte packet)
 		{
 			bool result = false;
 			
@@ -186,10 +144,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Получить пакет побайтно.
-		*/
-		byte TakePacket()
+		byte TakePacket1() const
 		{
 			byte result = 0x00;
 			
@@ -201,10 +156,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Вставить пакет по ссылке.
-		*/
-		bool PutPacket(byte *packet, uint8_t length)
+		bool PutPacket2(byte *packet, uint8_t length)
 		{
 			bool result = false;
 			
@@ -221,49 +173,43 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Получить пакет по ссылке.
-		*/
-		byte *TakePacket()
+		const byte *TakePacket2() const
 		{
-			return &this->_buffer;
+			return this->_buffer;
 		}
 		
-		/*
-			Получить длину пакета.
-		*/
-		uint8_t TakePacketLength()
+		uint8_t TakePacketLength() const
 		{
 			return (this->_buffer[4] + 8);
 		}
 		
-		/*
-			Проверить пакет на валидность (Стартовый и топовый байт, длинна данных и фактическая длинна данных, CRC16).
-		*/
-		bool IsValidPacket()
+		bool CheckPacket() const
 		{
-			bool result = true;
+			bool result = false;
 			
-			if(this->_buffer[0] != 0x5B || this->_buffer[this->_buffer[4] + 3] != 0x5D)
+			if(this->_buffer[0] == 0x5B || this->_buffer[this->_buffer[4] + 3] == 0x5D)
 			{
-				// Нету стартового или стопового байта или нарушена длинна данных (указанная длинна одна а фактическая другая).
-				result = false;
-			}
-			
-			uint16_t crc = this->TakeCRC16();
-			if(this->_buffer[this->_buffer[4] + 1] != highByte(crc) || this->_buffer[this->_buffer[4] + 2] != lowByte(crc))
-			{
-				// Нарушена CRC пакета.
-				result = false;
+				uint16_t crc = this->TakeCRC16();
+				if(this->_buffer[this->_buffer[4] + 1] == highByte(crc) || this->_buffer[this->_buffer[4] + 2] == lowByte(crc))
+				{
+					result = true;
+				}
 			}
 			
 			return result;
 		}
 		
-		/*
-			Посчитать CRC16.
-		*/
-		uint16_t TakeCRC16()
+		void PreparePackage()
+		{
+			uint16_t crc = this->TakeCRC16();
+			this->_buffer[this->_buffer[4] + 5] = highByte(crc);
+			this->_buffer[this->_buffer[4] + 6] = lowByte(crc);
+			this->_buffer[this->_buffer[4] + 7] = 0x5D;
+			
+			return;
+		}
+		
+		uint16_t TakeCRC16() const
 		{
 			uint16_t result = 65535;
 			
@@ -275,18 +221,13 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		/*
-			Почистить поля класса.
-		*/
 		void Cleaning()
 		{
 			memset(this->_buffer, 0x00, (_maxDataLength + 8));
 			this->_buffer[0] = 0x5B;
-			this->_buffer[_maxDataLength + 7] = 0x5D;
 			this->_dataLength = 0;
 			this->_takeDataIndex = 0;
 			this->_takePacketIndex = 0;
-			this->_crc16 = 65535;
 			
 			return;
 		}
@@ -297,47 +238,30 @@ class DragonNET_Packet
 		uint8_t _dataLength;
 		uint8_t _takeDataIndex;
 		uint8_t _takePacketIndex;
-		uint16_t _crc16;
 };
 
 #endif
 
 /*
-	Пакет:
-		[0]    - Стартовый байт.
-		[*1]   - Адрес получателя.
-		[*2]   - Адрес отправителя.
-		[*3]   - Системный байт.
-		  |- [7] - Флаг типа сети, 0 - Ведущий-Ведомые, 1 - P2P.
-		  |- [6] - Флаг мастер устройства, 0 - Ведомый, 1 - Ведущий.
-		  |- [5] - Флаг системной команды, 0 - Общая, 1 - Системная.
-		  |- [4] - Резерв
-		  |- [3] - Резерв
-		  |- [2] - Флаг запроса с ожиданием ответа, 0 - Ответ не нужен, 1 - Ответ нужен.
-		  |- [1] - Флаг подтверждения получения пакета, 0 - Подтверждение не нужно, 1 - Подтверждение нужно, (Не может быть установлен на подтверждающий пакет).
-		  |- [0] - Резерв
-		[*4]   - Длинна данных.
-		[*5+n] - Данные.
-		[6+n]  - CRC16 H.
-		[7+n]  - CRC16 L.
-		[8+n]  - Стоповый байт.
-	Символом '*' указаны фрагменты данных, участвующие в подсчёте CRC16.
-*/
 
-/*
-	Нужные методы:
-	*1)  Вставить \ Взять адрес получателя.
-	*2)  Вставить \ Взять адрес отправителя.
-	*3)  Вставить \ Взять байт настройки.
-	*4)  Вставить \ Взять данные побайтно.
-	*5)  Вставить \ Взять данные по ссылке.
-	*6)  Взять длину данных.
-	*7)  Вставить \ Взять пакет побайтно.
-	*8)  Вставить \ Взять пакет по ссылке.
-	*9)  Взять длину пакета.
-	*10) Проверить пакет на валидность (Стартовый и топовый байт, длинна данных и фактическая длинна данных, CRC16).
-	
-	Не реализовано:
-		Логика проверки CRC16 при вставке готового пакета (приём пакета), а так-же вставка CRC16 в пакет, при сборе пакета (отправка пакета)
+	void PutToAddress(uint8_t address)				- Вставить адрес получателя.
+	uint8_t TakeToAddress() const					- Взять адрес получателя.
+	void PutFromAddress(uint8_t address)			- Вставить адрес отправителя.
+	uint8_t TakeFromAddress() const					- Взять адрес отправителя.
+	void PutConfigByte(byte config)					- Вставить байт настройки.
+	byte TakeConfigByte() const						- Взять байт настройки.
+	bool PutData1(byte data)						- Вставить данные побайтно.
+	byte TakeData1() const							- Взять данные побайтно.
+	bool PutData2(byte *data, uint8_t length)		- Вставить данные по ссылке.
+	const byte *TakeData2() const					- Взять данные по ссылке.
+	uint8_t TakeDataLength() const					- Взять длину данных.
+	bool PutPacket1(byte packet)					- Вставить пакет побайтно.
+	byte TakePacket1() const						- Взять пакет побайтно.
+	bool PutPacket2(byte *packet, uint8_t length)	- Вставить пакет по ссылке.
+	const byte *TakePacket2() const					- Взять пакет по ссылке.
+	uint8_t TakePacketLength() const				- Взять длину пакета.
+	bool CheckPacket() const						- Проверка пакета, при приёме.
+	void PreparePackage()							- Подготовка пакета перед отправкой.
+	uint16_t TakeCRC16() const						- Взять CRC16 от пакета.
 
 */
