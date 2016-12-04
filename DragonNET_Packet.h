@@ -1,6 +1,6 @@
 /*
  *	DragonNET_Packet.h
- *  Class data packet.
+ *	Class data packet.
  *
  *	@author		Nikolai Tikhonov aka Dragon_Knight <dubki4132@mail.ru>, https://vk.com/globalzone_edev
  *	@coauthor	Valeriy V Dmitriev aka valmat <ufabiz@gmail.com>
@@ -38,6 +38,14 @@ class DragonNET_Packet
 		}
 		
 		~DragonNET_Packet() = default;
+		
+		// Copy & Move constructors.
+		DragonNET_Packet(const DragonNET_Packet&) = default;
+		DragonNET_Packet(DragonNET_Packet &&) = default;
+		
+		// Copy & Move assigments.
+		DragonNET_Packet& operator=(const DragonNET_Packet &) = default;
+		DragonNET_Packet& operator=(DragonNET_Packet &&) = default;
 		
 		void PutToAddress(uint8_t address)
 		{
@@ -79,10 +87,10 @@ class DragonNET_Packet
 		{
 			bool result = false;
 			
-			if(this->_dataLength < _maxDataLength)
+			if(this->_putDataIndex < _maxDataLength)
 			{
-				this->_buffer[5 + this->_dataLength++] = data;
-				this->_buffer[4] = this->_dataLength;
+				this->_buffer[5 + this->_putDataIndex++] = data;
+				this->_buffer[4] = this->_putDataIndex;
 				
 				result = true;
 			}
@@ -134,9 +142,9 @@ class DragonNET_Packet
 		{
 			bool result = false;
 			
-			if(this->putPacketIndex <= (_maxDataLength + 8))
+			if(this->_putPacketIndex <= (_maxDataLength + 8))
 			{
-				this->_buffer[this->putPacketIndex++] = packet;
+				this->_buffer[this->_putPacketIndex++] = packet;
 				
 				result = true;
 			}
@@ -183,16 +191,20 @@ class DragonNET_Packet
 			return (this->_buffer[4] + 8);
 		}
 		
-		bool CheckPacket() const
+		uint8_t CheckPacket() const
 		{
-			bool result = false;
+			uint8_t result = 0;
 			
-			if(this->_buffer[0] == 0x5B || this->_buffer[this->_buffer[4] + 3] == 0x5D)
+			if(this->_buffer[0] != 0x5B || this->_buffer[this->_buffer[4] + 7] != 0x5D)
+			{
+				result = 1;
+			}
+			else
 			{
 				uint16_t crc = this->TakeCRC16();
-				if(this->_buffer[this->_buffer[4] + 1] == highByte(crc) || this->_buffer[this->_buffer[4] + 2] == lowByte(crc))
+				if(this->_buffer[this->_buffer[4] + 5] != highByte(crc) || this->_buffer[this->_buffer[4] + 6] != lowByte(crc))
 				{
-					result = true;
+					result = 2;
 				}
 			}
 			
@@ -202,6 +214,7 @@ class DragonNET_Packet
 		void PreparePackage()
 		{
 			uint16_t crc = this->TakeCRC16();
+			
 			this->_buffer[this->_buffer[4] + 5] = highByte(crc);
 			this->_buffer[this->_buffer[4] + 6] = lowByte(crc);
 			this->_buffer[this->_buffer[4] + 7] = 0x5D;
@@ -225,8 +238,9 @@ class DragonNET_Packet
 		{
 			memset(this->_buffer, 0x00, (_maxDataLength + 8));
 			this->_buffer[0] = 0x5B;
-			this->_dataLength = 0;
+			this->_putDataIndex = 0;
 			this->_takeDataIndex = 0;
+			this->_putPacketIndex = 0;
 			this->_takePacketIndex = 0;
 			
 			return;
@@ -235,8 +249,9 @@ class DragonNET_Packet
 		
 	private:
 		byte _buffer[_maxDataLength + 8];
-		uint8_t _dataLength;
+		uint8_t _putDataIndex;
 		uint8_t _takeDataIndex;
+		uint8_t _putPacketIndex;
 		uint8_t _takePacketIndex;
 };
 
@@ -260,8 +275,9 @@ class DragonNET_Packet
 	bool PutPacket2(byte *packet, uint8_t length)	- Вставить пакет по ссылке.
 	const byte *TakePacket2() const					- Взять пакет по ссылке.
 	uint8_t TakePacketLength() const				- Взять длину пакета.
-	bool CheckPacket() const						- Проверка пакета, при приёме.
+	uint8_t CheckPacket() const						- Проверка пакета, при приёме.
 	void PreparePackage()							- Подготовка пакета перед отправкой.
 	uint16_t TakeCRC16() const						- Взять CRC16 от пакета.
+	void Cleaning()									- Сбросить класс.
 
 */
