@@ -25,96 +25,84 @@ void DragonNET::AttachErrorCallback(ErrorCallback_t callback)
 	return;
 }
 
-void DragonNET::TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength)
+void DragonNET::TransmitPackage(DragonNETPacket &package)
 {
-	this->_TXBuffer[0] = toAddress;
-	this->_TXBuffer[1] = this->_parameters.address;
-	this->_TXBuffer[2] = this->_systemByte;
-	this->_TXBuffer[3] = dataLength;
-	for(uint8_t i = 0; i < dataLength; ++i)
+	package.PreparePackage();
+	if(package.CheckPacket() == 0)
 	{
-		this->_TXBuffer[4 + i] = data[i];
+		digitalWrite(this->_directionPin, HIGH);
+		this->_serial->write(package.TakePacket2(), package.TakePacketLength());
+		this->_serial->flush();
+		digitalWrite(this->_directionPin, LOW);
 	}
-	
-	uint16_t crc = this->CRC16(this->_TXBuffer, (dataLength + 4));
-	
-	digitalWrite(this->_directionPin, HIGH);
-	this->_serial->write(DRAGONNET_STARTBYTE);
-	this->_serial->write(this->_TXBuffer, (dataLength + 4));
-	this->_serial->write(highByte(crc));
-	this->_serial->write(lowByte(crc));
-	this->_serial->write(DRAGONNET_ENDBYTE);
-	this->_serial->flush();
-	digitalWrite(this->_directionPin, LOW);
+	package.Cleaning();
 	
 	return;
 }
 
-void DragonNET::ReceivePackage()
+void DragonNET::ReceivePackage(uint32_t currentMicroTime)
 {
-	uint32_t currentTime = millis();
-	
-	if(this->_lastReceiveTime + DRAGONNET_RECEIVETIMEOUT <= currentTime)
+	if(this->_lastMicroTime + DRAGONNET_RECEIVETIMEOUT <= currentMicroTime)
 	{
-		this->_lastReceiveTime = currentTime;
+		this->_lastMicroTime = currentMicroTime;
 		
-		while(this->_serial->available() > 0)
-		{
-			this->_serial->read();
-		}
+		this->_requestPacket.Cleaning();
 		
-		this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
-		this->_RXBufferIndex = 0;
+		while(this->_serial->available() > 0){ this->_serial->read(); }
 	}
 	
 	bool isReceived = false;
 	while(this->_serial->available() > 0)
 	{
-		if(this->_RXBufferIndex == sizeof(this->_RXBuffer))
+		bool result = this->_requestPacket.PutPacket1(this->_serial->read());
+		if(result == false)
 		{
-			// Если буфер переполнен, то....
-			break;
+			this->_requestPacket.Cleaning();
+			
+			if(this->_ErrorCallback != NULL)
+			{
+				this->_ErrorCallback(DRAGONNET_ERROR_OVERFLOW);
+			}
 		}
 		
-		this->_RXBuffer[this->_RXBufferIndex++] = this->_serial->read();
 		isReceived = true;
 	}
 	
 	if(isReceived == true)
 	{
-		if(this->_RXBuffer[0] == DRAGONNET_STARTBYTE && this->_RXBuffer[(this->_RXBufferIndex - 1)] == DRAGONNET_ENDBYTE)
+		uint8_t result = this->_requestPacket.CheckPacket();		// Проблема. Пока пакет не до конца собран, будут вызывается колбэки о нарушенной структуре пакета.
+		if(result == 0)
 		{
-			uint16_t crc = this->CRC16(this->_RXBuffer + 1, (this->_RXBufferIndex - 4));
-			
-			if(this->_RXBuffer[(this->_RXBufferIndex - 3)] == highByte(crc) && this->_RXBuffer[(this->_RXBufferIndex - 2)] == lowByte(crc))
+			if(this->_requestPacket.TakeToAddress() == this->_myAddress || this->_requestPacket.TakeToAddress() == DRAGONNET_BROADCASTADDRESS || this->_receiveAll == true)
 			{
-				if(this->_RXBuffer[1] == this->_parameters.address || this->_RXBuffer[1] == DRAGONNET_BROADCASTADDRESS || this->_parameters.receiveAll == true)
+				if(this->_RXcallback != NULL)
 				{
-					if(this->_RXcallback != NULL)
-					{
-						this->_RXcallback(this->_RXBuffer[2], this->_RXBuffer[1], this->_RXBuffer + 6, this->_RXBufferIndex - 9);
-					}
-				}
-				else
-				{
-					// Пакет предназначен не для этого устройства.
-					if(this->_ErrorCallback != NULL)
-					{
-						this->_ErrorCallback(0xEE);
-					}
+					this->_responsePacket.Cleaning();
+					
+					this->_RXcallback(this->_requestPacket, this->_responsePacket);
+					
+					this->TransmitPackage(this->_responsePacket);
+					
 				}
 			}
 			else
 			{
-				// Ошибка CRC.
+				// Пакет предназначен не для этого устройства (Отладка)
 				if(this->_ErrorCallback != NULL)
 				{
-					this->_ErrorCallback(DRAGONNET_ERROR_CRC);
+					this->_ErrorCallback(0xEE);
 				}
 			}
 		}
+		else
+		{
+			if(this->_ErrorCallback != NULL)
+			{
+				this->_ErrorCallback(DRAGONNET_ERROR_ + result);
+			}
+		}
 		
-		this->_lastReceiveTime = currentTime;
+		this->_lastMicroTime = currentMicroTime;
 	}
 	
 	return;
@@ -136,33 +124,6 @@ void DragonNET::Begin()
 {
 	pinMode(this->_directionPin, OUTPUT);
 	digitalWrite(this->_directionPin, LOW);
-	
-	this->ClearArray(this->_TXBuffer, sizeof(this->_TXBuffer));
-	this->ClearArray(this->_RXBuffer, sizeof(this->_RXBuffer));
-	
-	return;
-}
-
-uint16_t DragonNET::CRC16(byte *array, uint8_t length)
-{
-	uint16_t crc = 0xFFFF;
-	uint8_t i;
-	
-	while(length--)
-	{
-		crc ^= *array++ << 8;
-		for(i = 0; i < 8; i++)
-		{
-			crc = crc & 0x8000 ? (crc << 1) ^ 0x1021 : crc << 1;
-		}
-	}
-	
-	return crc;
-}
-
-void DragonNET::ClearArray(byte *array, uint8_t length)
-{
-	memset(array, 0x00, length);
 	
 	return;
 }

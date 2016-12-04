@@ -10,16 +10,24 @@
 
 /*
 	Пакет:
-		[0] - Стартовый байт.
-		[1] - Адрес получателя.		|
-		[2] - Адрес отправителя.	|
-		[3] - Системный байт.		|
-		[4] - Длинна данных.		|
-		[5+n] - Данные.				|
-		[6+n] - CRC16 H.
-		[7+n] - CRC16 L.
-		[8+n] - Стоповый байт.
-	Символом '|' указаны фрагменты данных, участвующие в подсчёте CRC16.
+		[0]    - Стартовый байт.
+		[*1]   - Адрес получателя.
+		[*2]   - Адрес отправителя.
+		[*3]   - Системный байт.
+		  |- [7] - Флаг типа сети, 0 - Ведущий-Ведомые, 1 - P2P.
+		  |- [6] - Флаг мастер устройства, 0 - Ведомый, 1 - Ведущий.
+		  |- [5] - Флаг системной команды, 0 - Общая, 1 - Системная.
+		  |- [4] - Резерв
+		  |- [3] - Резерв
+		  |- [2] - Флаг запроса с ожиданием ответа, 0 - Ответ не нужен, 1 - Ответ нужен.
+		  |- [1] - Флаг подтверждения получения пакета, 0 - Подтверждение не нужно, 1 - Подтверждение нужно, (Не может быть установлен на подтверждающий пакет).
+		  |- [0] - Резерв
+		[*4]   - Длинна данных.
+		[*5+n] - Данные.
+		[6+n]  - CRC16 H.
+		[7+n]  - CRC16 L.
+		[8+n]  - Стоповый байт.
+	Символом '*' указаны фрагменты данных, участвующие в подсчёте CRC16.
 */
 
 /*
@@ -32,80 +40,86 @@
 #define DragonNET_h_
 
 #include <Arduino.h>
+#include "DragonNET_Packet.h"
 #if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-	#define SERIAL	HardwareSerial
-	#include "HardwareSerial.h"
+	#define UART	HardwareSerial
+	#include <HardwareSerial.h>
 #else
-	#define SERIAL	SoftwareSerial
-	#include "SoftwareSerial.h"
+	#define UART	SoftwareSerial
+	#include <SoftwareSerial.h>
 #endif
 
-#define DRAGONNET_STARTBYTE			0x5B
-#define DRAGONNET_ENDBYTE			0x5D
+/*
+#if F_CPU == 16000000
+#elif F_CPU == 8000000
+#elif F_CPU == 20000000
+#else
+#error This version supports only 20, 16 and 8MHz processors
+#endif
+*/
+
 #define DRAGONNET_BROADCASTADDRESS	0xFF
-#define DRAGONNET_RECEIVETIMEOUT	10
+#define DRAGONNET_RECEIVETIMEOUT	10000		// мкс
 #define DRAGONNET_BUFFERSIZE		64
 
-#define DRAGONNET_ERROR_CRC			0xE0
+#define DRAGONNET_ERROR_			0xE0		// База ошибок.
+#define DRAGONNET_ERROR_STRUCTURE	0xE1		// Нарушена структура пакета.
+#define DRAGONNET_ERROR_CRC			0xE2		// Нарушена контрольная сумма.
+#define DRAGONNET_ERROR_OVERFLOW	0xEF		// Переполнение RX буфера.
 
-struct DragonNETParameters_t
-{
-	uint8_t address;
-	char name[16];
-	bool receiveAll;
-};
+using DragonNETPacket = DragonNET_Packet<DRAGONNET_BUFFERSIZE>;
 
 class DragonNET
 {
-	using RXcallback_t = void (*)(uint8_t fromAddress, uint8_t toAddress, byte *data, uint8_t dataLength);
+	using RXcallback_t = void (*)(DragonNETPacket &request, DragonNETPacket &response);
 	using ErrorCallback_t = void (*)(uint8_t errorType);
 	
 	public:
-		void Begin(uint32_t baudRate, DragonNETParameters_t parameters){ this->_serial->begin(baudRate); this->_parameters = parameters; this->Begin(); return; }
+		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll){ this->_serial->begin(baudRate); this->_myAddress = address; this->_receiveAll = receiveAll; this->Begin(); return; }
 		void AttachRXCallback(RXcallback_t callback);
 		void AttachErrorCallback(ErrorCallback_t callback);
-		void TransmitPackage(uint8_t toAddress, byte *data, uint8_t dataLength);
-		void ReceivePackage();
+		void TransmitPackage(DragonNETPacket &package);
+		void ReceivePackage(uint32_t currentMicroTime);
 		void SetSystemByte(uint8_t index, bool value);
 		bool GetSystemByte(uint8_t index);
 	protected:
-		DragonNET(SERIAL &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ return; }
+		DragonNET(UART &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ return; }
 	private:
 		void Begin();
-		uint16_t CRC16(byte *array, uint8_t length);
-		void ClearArray(byte *array, uint8_t length);
 		
-		SERIAL *_serial;
+		UART *_serial;
+		DragonNETPacket _requestPacket;
+		DragonNETPacket _responsePacket;
 		RXcallback_t _RXcallback;
 		ErrorCallback_t _ErrorCallback;
-		DragonNETParameters_t _parameters;
-		byte _TXBuffer[DRAGONNET_BUFFERSIZE + 4];
-		byte _RXBuffer[DRAGONNET_BUFFERSIZE + 8];
-		uint32_t _lastReceiveTime = 0;
-		uint8_t _RXBufferIndex = 0;
+		uint32_t _lastMicroTime = 0;
 		uint8_t _directionPin;
+		uint8_t _myAddress;
+		bool _receiveAll;
 		byte _systemByte;
 };
 
 class DragonNET_Master : public DragonNET
 {
 	public:
-		DragonNET_Master(SERIAL &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
-		DragonNET_Master(SERIAL &&serial, uint8_t directionPin) = delete;
+		DragonNET_Master(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
+		DragonNET_Master(UART &&serial, uint8_t directionPin) = delete;
 };
 
 class DragonNET_Slave : public DragonNET
 {
 	public:
-		DragonNET_Slave(SERIAL &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
-		DragonNET_Slave(SERIAL &&serial, uint8_t directionPin) = delete;
+		DragonNET_Slave(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
+		DragonNET_Slave(UART &&serial, uint8_t directionPin) = delete;
+		
+		void Processing();
 };
 
 class DragonNET_P2P : public DragonNET
 {
 	public:
-		DragonNET_P2P(SERIAL &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
-		DragonNET_P2P(SERIAL &&serial, uint8_t directionPin) = delete;
+		DragonNET_P2P(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
+		DragonNET_P2P(UART &&serial, uint8_t directionPin) = delete;
 };
 
 #endif

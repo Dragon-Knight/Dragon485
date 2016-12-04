@@ -256,28 +256,3 @@ class DragonNET_Packet
 };
 
 #endif
-
-/*
-
-	void PutToAddress(uint8_t address)				- Вставить адрес получателя.
-	uint8_t TakeToAddress() const					- Взять адрес получателя.
-	void PutFromAddress(uint8_t address)			- Вставить адрес отправителя.
-	uint8_t TakeFromAddress() const					- Взять адрес отправителя.
-	void PutConfigByte(byte config)					- Вставить байт настройки.
-	byte TakeConfigByte() const						- Взять байт настройки.
-	bool PutData1(byte data)						- Вставить данные побайтно.
-	byte TakeData1() const							- Взять данные побайтно.
-	bool PutData2(byte *data, uint8_t length)		- Вставить данные по ссылке.
-	const byte *TakeData2() const					- Взять данные по ссылке.
-	uint8_t TakeDataLength() const					- Взять длину данных.
-	bool PutPacket1(byte packet)					- Вставить пакет побайтно.
-	byte TakePacket1() const						- Взять пакет побайтно.
-	bool PutPacket2(byte *packet, uint8_t length)	- Вставить пакет по ссылке.
-	const byte *TakePacket2() const					- Взять пакет по ссылке.
-	uint8_t TakePacketLength() const				- Взять длину пакета.
-	uint8_t CheckPacket() const						- Проверка пакета, при приёме.
-	void PreparePackage()							- Подготовка пакета перед отправкой.
-	uint16_t TakeCRC16() const						- Взять CRC16 от пакета.
-	void Cleaning()									- Сбросить класс.
-
-*/

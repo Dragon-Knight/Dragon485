@@ -10,3 +10,12 @@
 
 #include <Arduino.h>
 #include "DragonNET.h"
+
+void DragonNET_Slave::Processing()
+{
+	uint32_t currentMicroTime = micros();
+	
+	this->ReceivePackage(currentMicroTime);
+	
+	return;
+}
