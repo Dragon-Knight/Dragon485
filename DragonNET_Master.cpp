@@ -10,3 +10,26 @@
 
 #include <Arduino.h>
 #include "DragonNET.h"
+
+void DragonNET_Master::Processing()
+{
+	uint32_t currentMicroTime = micros();
+	
+	this->Processing(currentMicroTime);
+	
+	return;
+}
+
+void DragonNET_Master::Processing(uint32_t currentMicroTime)
+{
+	this->ReceivePackage(currentMicroTime);
+	
+	return;
+}
+
+void DragonNET_Master::initialization()
+{
+	this->_configByte = 0b01000000;
+	
+	return;
+}

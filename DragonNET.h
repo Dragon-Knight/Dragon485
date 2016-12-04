@@ -62,6 +62,9 @@
 #define DRAGONNET_RECEIVETIMEOUT	10000		// мкс
 #define DRAGONNET_BUFFERSIZE		64
 
+#define DRAGONNET_NEED_ANSWER		0x04		// Пакет требует ответ.
+#define DRAGONNET_NEED_CONFIRM		0x02		// Пакет требует подтверждения получения.
+
 #define DRAGONNET_ERROR_			0xE0		// База ошибок.
 #define DRAGONNET_ERROR_STRUCTURE	0xE1		// Нарушена структура пакета.
 #define DRAGONNET_ERROR_CRC			0xE2		// Нарушена контрольная сумма.
@@ -71,21 +74,20 @@ using DragonNETPacket = DragonNET_Packet<DRAGONNET_BUFFERSIZE>;
 
 class DragonNET
 {
-	using RXcallback_t = void (*)(DragonNETPacket &request, DragonNETPacket &response);
+	using RXcallback_t = bool (*)(DragonNETPacket &request, DragonNETPacket &response);
 	using ErrorCallback_t = void (*)(uint8_t errorType);
 	
 	public:
-		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll){ this->_serial->begin(baudRate); this->_myAddress = address; this->_receiveAll = receiveAll; this->Begin(); return; }
+		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll){ this->_serial->begin(baudRate); this->_myAddress = address; this->_receiveAll = receiveAll; this->begin(); return; }
 		void AttachRXCallback(RXcallback_t callback);
 		void AttachErrorCallback(ErrorCallback_t callback);
 		void TransmitPackage(DragonNETPacket &package);
 		void ReceivePackage(uint32_t currentMicroTime);
-		void SetSystemByte(uint8_t index, bool value);
-		bool GetSystemByte(uint8_t index);
 	protected:
 		DragonNET(UART &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ return; }
+		byte _configByte;	// Может переделать...
 	private:
-		void Begin();
+		void begin();
 		
 		UART *_serial;
 		DragonNETPacket _requestPacket;
@@ -96,23 +98,32 @@ class DragonNET
 		uint8_t _directionPin;
 		uint8_t _myAddress;
 		bool _receiveAll;
-		byte _systemByte;
 };
 
 class DragonNET_Master : public DragonNET
 {
 	public:
-		DragonNET_Master(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
+		DragonNET_Master(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ this->initialization(); return; }
 		DragonNET_Master(UART &&serial, uint8_t directionPin) = delete;
+		void Processing();
+		void Processing(uint32_t currentMicroTime);
+	protected:
+		
+	private:
+		void initialization();
 };
 
 class DragonNET_Slave : public DragonNET
 {
 	public:
-		DragonNET_Slave(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
+		DragonNET_Slave(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ this->initialization(); return; }
 		DragonNET_Slave(UART &&serial, uint8_t directionPin) = delete;
-		
 		void Processing();
+		void Processing(uint32_t currentMicroTime);
+	protected:
+		
+	private:
+		void initialization();
 };
 
 class DragonNET_P2P : public DragonNET

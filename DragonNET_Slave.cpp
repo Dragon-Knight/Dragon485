@@ -15,7 +15,21 @@ void DragonNET_Slave::Processing()
 {
 	uint32_t currentMicroTime = micros();
 	
+	this->Processing(currentMicroTime);
+	
+	return;
+}
+
+void DragonNET_Slave::Processing(uint32_t currentMicroTime)
+{
 	this->ReceivePackage(currentMicroTime);
+	
+	return;
+}
+
+void DragonNET_Slave::initialization()
+{
+	this->_configByte = 0b00000000;
 	
 	return;
 }

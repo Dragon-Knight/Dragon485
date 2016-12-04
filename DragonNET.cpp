@@ -27,6 +27,7 @@ void DragonNET::AttachErrorCallback(ErrorCallback_t callback)
 
 void DragonNET::TransmitPackage(DragonNETPacket &package)
 {
+	package.PutConfigByte(this->_configByte);
 	package.PreparePackage();
 	if(package.CheckPacket() == 0)
 	{
@@ -54,8 +55,7 @@ void DragonNET::ReceivePackage(uint32_t currentMicroTime)
 	bool isReceived = false;
 	while(this->_serial->available() > 0)
 	{
-		bool result = this->_requestPacket.PutPacket1(this->_serial->read());
-		if(result == false)
+		if(this->_requestPacket.PutPacket1(this->_serial->read()) == false)
 		{
 			this->_requestPacket.Cleaning();
 			
@@ -75,22 +75,31 @@ void DragonNET::ReceivePackage(uint32_t currentMicroTime)
 		{
 			if(this->_requestPacket.TakeToAddress() == this->_myAddress || this->_requestPacket.TakeToAddress() == DRAGONNET_BROADCASTADDRESS || this->_receiveAll == true)
 			{
+				/*
+				byte rxconfig = this->_requestPacket.TakeConfigByte();
+				if(rxconfig & DRAGONNET_NEED_CONFIRM)
+				{
+					this->_responsePacket.Cleaning();
+					this->_responsePacket.PutToAddress(this->_requestPacket.TakeFromAddress());
+					this->_responsePacket.PutFromAddress(this->_myAddress);
+					this->_responsePacket.PutData1('Y');
+					this->TransmitPackage(this->_responsePacket);
+				}
+				*/
+				
 				if(this->_RXcallback != NULL)
 				{
 					this->_responsePacket.Cleaning();
 					
-					this->_RXcallback(this->_requestPacket, this->_responsePacket);
+					//this->_configByte = this->_configByte | this->_RXcallback(this->_requestPacket, this->_responsePacket);
+					bool response = this->_RXcallback(this->_requestPacket, this->_responsePacket);
 					
-					this->TransmitPackage(this->_responsePacket);
+					if(response == true)
+					{
+						this->_responsePacket.PutFromAddress(this->_myAddress);
+						this->TransmitPackage(this->_responsePacket);
+					}
 					
-				}
-			}
-			else
-			{
-				// Пакет предназначен не для этого устройства (Отладка)
-				if(this->_ErrorCallback != NULL)
-				{
-					this->_ErrorCallback(0xEE);
 				}
 			}
 		}
@@ -108,19 +117,7 @@ void DragonNET::ReceivePackage(uint32_t currentMicroTime)
 	return;
 }
 
-void DragonNET::SetSystemByte(uint8_t index, bool value)
-{
-	bitWrite(this->_systemByte, index, value);
-	
-	return;
-}
-
-bool DragonNET::GetSystemByte(uint8_t index)
-{
-	return bitRead(this->_systemByte, index);
-}
-
-void DragonNET::Begin()
+void DragonNET::begin()
 {
 	pinMode(this->_directionPin, OUTPUT);
 	digitalWrite(this->_directionPin, LOW);

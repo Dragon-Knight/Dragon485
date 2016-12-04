@@ -98,7 +98,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		byte TakeData1() const
+		byte TakeData1()
 		{
 			byte result = 0x00;
 			
@@ -152,7 +152,7 @@ class DragonNET_Packet
 			return result;
 		}
 		
-		byte TakePacket1() const
+		byte TakePacket1()
 		{
 			byte result = 0x00;
 			

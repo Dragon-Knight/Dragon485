@@ -68,7 +68,7 @@ void OnReceive(DragonNETPacket &request, DragonNETPacket &response)
 {
 	response.PutToAddress(45);
 	response.PutFromAddress(46);
-	response.PutConfigByte(99);
+	//response.PutConfigByte(99);
 	response.PutData1(0x50);
 	response.PutData1(0x50);
 	response.PutData1(0x50);
