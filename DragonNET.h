@@ -17,11 +17,11 @@
 		  |- [7] - Флаг типа сети, 0 - Ведущий-Ведомые, 1 - P2P.
 		  |- [6] - Флаг мастер устройства, 0 - Ведомый, 1 - Ведущий.
 		  |- [5] - Флаг системной команды, 0 - Общая, 1 - Системная.
-		  |- [4] - Резерв
-		  |- [3] - Резерв
+		  |- [4] - Резерв.
+		  |- [3] - Резерв.
 		  |- [2] - Флаг запроса с ожиданием ответа, 0 - Ответ не нужен, 1 - Ответ нужен.
 		  |- [1] - Флаг подтверждения получения пакета, 0 - Подтверждение не нужно, 1 - Подтверждение нужно, (Не может быть установлен на подтверждающий пакет).
-		  |- [0] - Резерв
+		  |- [0] - Резерв.
 		[*4]   - Длинна данных.
 		[*5+n] - Данные.
 		[6+n]  - CRC16 H.
@@ -31,16 +31,19 @@
 */
 
 /*
-	Конструкторы и метод Begin реализованы в H файле по причине того, что только так можно реализовать универсальный класс,
-	который может работать как с HardwareSerial так и с SoftwareSerial.
-	Есть другие идеи? жду предложений :)
+	Весь код написан исключительно в h файлах по причине того, что не знаю как сделать класс, который сможет принимать как HardwareSerial так и SoftwareSerial,
+	а статический полиморфизм для меня как китайский язык...
+	Если есть идеи, то добро пожаловать :)
+	Задача: полная работоспособность на обоих UART.
+	Причём некоторые микроконтроллеры не имеют на борту HardwareSerial.
 */
 
 #ifndef DragonNET_h_
 #define DragonNET_h_
 
 #include <Arduino.h>
-#include "DragonNET_Packet.h"
+#include "DragonNETPacket.h"
+
 #if !defined(DRAGONNET_USE_SOFTWARESERIAL)
 	#define UART	HardwareSerial
 	#include <HardwareSerial.h>
@@ -49,18 +52,12 @@
 	#include <SoftwareSerial.h>
 #endif
 
-/*
-#if F_CPU == 16000000
-#elif F_CPU == 8000000
-#elif F_CPU == 20000000
-#else
-#error This version supports only 20, 16 and 8MHz processors
-#endif
-*/
-
 #define DRAGONNET_BROADCASTADDRESS	0xFF
 #define DRAGONNET_RECEIVETIMEOUT	10000		// мкс
 #define DRAGONNET_BUFFERSIZE		64
+
+
+#define DRAGONNET_SYSTEM_COMMAND	0x20		// Флаг системной команды.
 
 #define DRAGONNET_NEED_ANSWER		0x04		// Пакет требует ответ.
 #define DRAGONNET_NEED_CONFIRM		0x02		// Пакет требует подтверждения получения.
@@ -70,67 +67,11 @@
 #define DRAGONNET_ERROR_CRC			0xE2		// Нарушена контрольная сумма.
 #define DRAGONNET_ERROR_OVERFLOW	0xEF		// Переполнение RX буфера.
 
-using DragonNETPacket = DragonNET_Packet<DRAGONNET_BUFFERSIZE>;
+using DragonNETPacket_t = DragonNETPacket<DRAGONNET_BUFFERSIZE>;
 
-class DragonNET
-{
-	using RXcallback_t = bool (*)(DragonNETPacket &request, DragonNETPacket &response);
-	using ErrorCallback_t = void (*)(uint8_t errorType);
-	
-	public:
-		void Begin(uint32_t baudRate, uint8_t address, bool receiveAll){ this->_serial->begin(baudRate); this->_myAddress = address; this->_receiveAll = receiveAll; this->begin(); return; }
-		void AttachRXCallback(RXcallback_t callback);
-		void AttachErrorCallback(ErrorCallback_t callback);
-		void TransmitPackage(DragonNETPacket &package);
-		void ReceivePackage(uint32_t currentMicroTime);
-	protected:
-		DragonNET(UART &serial, uint8_t directionPin) : _serial(&serial), _directionPin(directionPin){ return; }
-		byte _configByte;	// Может переделать...
-	private:
-		void begin();
-		
-		UART *_serial;
-		DragonNETPacket _requestPacket;
-		DragonNETPacket _responsePacket;
-		RXcallback_t _RXcallback;
-		ErrorCallback_t _ErrorCallback;
-		uint32_t _lastMicroTime = 0;
-		uint8_t _directionPin;
-		uint8_t _myAddress;
-		bool _receiveAll;
-};
-
-class DragonNET_Master : public DragonNET
-{
-	public:
-		DragonNET_Master(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ this->initialization(); return; }
-		DragonNET_Master(UART &&serial, uint8_t directionPin) = delete;
-		void Processing();
-		void Processing(uint32_t currentMicroTime);
-	protected:
-		
-	private:
-		void initialization();
-};
-
-class DragonNET_Slave : public DragonNET
-{
-	public:
-		DragonNET_Slave(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ this->initialization(); return; }
-		DragonNET_Slave(UART &&serial, uint8_t directionPin) = delete;
-		void Processing();
-		void Processing(uint32_t currentMicroTime);
-	protected:
-		
-	private:
-		void initialization();
-};
-
-class DragonNET_P2P : public DragonNET
-{
-	public:
-		DragonNET_P2P(UART &serial, uint8_t directionPin) : DragonNET(serial, directionPin){ return; }
-		DragonNET_P2P(UART &&serial, uint8_t directionPin) = delete;
-};
+#include "DragonNETCore.h"
+#include "DragonNETMaster.h"
+#include "DragonNETSlave.h"
+#include "DragonNETP2P.h"
 
 #endif

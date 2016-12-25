@@ -1,5 +1,5 @@
 /*
- *	DragonNET_Packet.h
+ *	DragonNETPacket.h
  *	Class data packet.
  *
  *	@author		Nikolai Tikhonov aka Dragon_Knight <dubki4132@mail.ru>, https://vk.com/globalzone_edev
@@ -8,8 +8,8 @@
  *	@repo		https://github.com/Dragon-Knight/DragonNET
  */
 
-#ifndef DragonNET_Packet_h_
-#define DragonNET_Packet_h_
+#ifndef DragonNETPacket_h_
+#define DragonNETPacket_h_
 
 #if defined(ARDUINO_ARCH_AVR)
 	#include <util/crc16.h>
@@ -27,25 +27,25 @@
 #endif
 
 template <uint8_t _maxDataLength>
-class DragonNET_Packet
+class DragonNETPacket
 {
 	public:
-		DragonNET_Packet()
+		DragonNETPacket()
 		{
 			this->Cleaning();
 			
 			return;
 		}
 		
-		~DragonNET_Packet() = default;
+		~DragonNETPacket() = default;
 		
 		// Copy & Move constructors.
-		DragonNET_Packet(const DragonNET_Packet&) = default;
-		DragonNET_Packet(DragonNET_Packet &&) = default;
+		DragonNETPacket(const DragonNETPacket&) = default;
+		DragonNETPacket(DragonNETPacket &&) = default;
 		
 		// Copy & Move assigments.
-		DragonNET_Packet& operator=(const DragonNET_Packet &) = default;
-		DragonNET_Packet& operator=(DragonNET_Packet &&) = default;
+		DragonNETPacket& operator=(const DragonNETPacket &) = default;
+		DragonNETPacket& operator=(DragonNETPacket &&) = default;
 		
 		void PutToAddress(uint8_t address)
 		{

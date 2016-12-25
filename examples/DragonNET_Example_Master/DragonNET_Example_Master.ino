@@ -12,26 +12,24 @@
 #include "DragonNET.h"
 
 #if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-	DragonNET_Slave bus(Serial, 13);
+	DragonNETMaster bus(Serial, 13);
 #else
 	SoftwareSerial mySerial(2, 3);
-	DragonNET_Slave bus(mySerial, 13);
+	DragonNETMaster bus(mySerial, 13);
 #endif
 
-DragonNETPacket Packet;
+DragonNETPacket_t Packet;
 
 void setup()
 {
 	Serial.begin(115200);
 	
-	bus.Begin(115200, 0x00, false);
-	bus.AttachRXCallback(OnReceive);
-	bus.AttachErrorCallback(OnError);
+	bus.Begin(115200, 0x00, false, OnReceive, OnError);
 	
 	byte data[] = {'5', '5', '5'};
 	Packet.PutData2(data, sizeof(data));
 	Packet.PutToAddress(0x02);
-	bus.TransmitPackage(Packet);
+	bus.Send(Packet);
 	
 	return;
 }
@@ -43,7 +41,7 @@ void loop()
 	return;
 }
 
-bool OnReceive(DragonNETPacket &request, DragonNETPacket &response)
+bool OnReceive(DragonNETPacket_t &request, DragonNETPacket_t &response)
 {
 	/*
 	// Выбор нужен ответ или нет, через ретурн.
@@ -63,6 +61,9 @@ bool OnReceive(DragonNETPacket &request, DragonNETPacket &response)
 
 void OnError(uint8_t errorType)
 {
+	Serial.write(">");
+	Serial.write(errorType);
+	Serial.write("<");
 	
 	
 	return;

@@ -12,19 +12,17 @@
 #include "DragonNET.h"
 
 #if !defined(DRAGONNET_USE_SOFTWARESERIAL)
-	DragonNET_Slave bus(Serial, 13);
+	DragonNETSlave bus(Serial, 13);
 #else
 	SoftwareSerial mySerial(12, 3);
-	DragonNET_Slave bus(mySerial, 13);
+	DragonNETSlave bus(mySerial, 13);
 #endif
 
 void setup()
 {
 	Serial.begin(115200);
 	
-	bus.Begin(115200, 0x02, false);
-	bus.AttachRXCallback(OnReceive);
-	bus.AttachErrorCallback(OnError);
+	bus.Begin(115200, 0x02, false, OnReceive, OnError);
 	
 	return;
 }
@@ -36,7 +34,7 @@ void loop()
 	return;
 }
 
-uint8_t OnReceive(DragonNETPacket &request, DragonNETPacket &response)
+bool OnReceive(DragonNETPacket_t &request, DragonNETPacket_t &response)
 {
 	bool result = false;
 	
@@ -45,10 +43,15 @@ uint8_t OnReceive(DragonNETPacket &request, DragonNETPacket &response)
 		response.PutToAddress(request.TakeFromAddress());
 		response.PutFromAddress(request.TakeToAddress());
 		response.PutData1(0x50);
-		response.PutData1(0x50);
-		response.PutData1(0x50);
-		response.PutData1(0x50);
-		response.PutData1(0x50);
+		response.PutData1(0x51);
+		response.PutData1(0x52);
+		response.PutData1(0x53);
+		response.PutData1(0x54);
+		response.PutData1(0x55);
+		response.PutData1(0x56);
+		response.PutData1(0x57);
+		response.PutData1(0x58);
+		response.PutData1(0x59);
 		
 		result = true;
 	}
